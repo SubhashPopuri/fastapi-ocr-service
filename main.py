@@ -9,7 +9,10 @@ from typing import Optional, List, Tuple
 import cv2
 import numpy as np
 from pdf2image import convert_from_bytes
+from pdf2image.exceptions import PDFInfoNotInstalledError
 from deskew import determine_skew
+import subprocess
+import shutil
 
 # Configure pytesseract to find tesseract binary
 import os
@@ -20,6 +23,75 @@ app = FastAPI(title="OCR Service", description="Extract text from PDFs and image
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Dependency Checking Functions
+# =============================================================================
+
+def _check_poppler_installed() -> Tuple[bool, Optional[str]]:
+    """Check if poppler-utils is installed and available in PATH."""
+    pdfinfo_path = shutil.which("pdfinfo")
+    if pdfinfo_path:
+        try:
+            result = subprocess.run(
+                ["pdfinfo", "-v"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            # pdfinfo -v outputs version to stderr
+            version_info = result.stderr.strip() if result.stderr else "unknown version"
+            return True, version_info
+        except Exception:
+            return True, "version unknown"
+    return False, None
+
+
+def _check_tesseract_installed() -> Tuple[bool, Optional[str]]:
+    """Check if tesseract is installed and available."""
+    tesseract_path = shutil.which("tesseract") or pytesseract.pytesseract.pytesseract_cmd
+    if tesseract_path and os.path.exists(tesseract_path):
+        try:
+            result = subprocess.run(
+                [tesseract_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            version_line = result.stdout.split('\n')[0] if result.stdout else "unknown version"
+            return True, version_line
+        except Exception:
+            return True, "version unknown"
+    return False, None
+
+
+def _get_tesseract_languages() -> List[str]:
+    """Get list of installed Tesseract language packs."""
+    try:
+        return pytesseract.get_languages()
+    except Exception:
+        return []
+
+
+# Check dependencies at module load
+POPPLER_AVAILABLE, POPPLER_VERSION = _check_poppler_installed()
+TESSERACT_AVAILABLE, TESSERACT_VERSION = _check_tesseract_installed()
+TESSERACT_LANGUAGES = _get_tesseract_languages()
+
+if not POPPLER_AVAILABLE:
+    logger.warning(
+        "Poppler is NOT installed or not in PATH. "
+        "OCR features (force_ocr, OCR fallback) will not work. "
+        "Install with: sudo apt-get install poppler-utils"
+    )
+
+if not TESSERACT_AVAILABLE:
+    logger.warning(
+        "Tesseract is NOT installed or not in PATH. "
+        "OCR features will not work. "
+        "Install with: sudo apt-get install tesseract-ocr"
+    )
 
 
 # =============================================================================
@@ -207,12 +279,33 @@ def _extract_with_pdfplumber(
 
 def _pdf_to_images(pdf_content: bytes, dpi: int = 300, password: Optional[str] = None) -> List[Image.Image]:
     """Convert PDF pages to images using pdf2image (poppler)."""
+    if not POPPLER_AVAILABLE:
+        raise RuntimeError(
+            "Poppler is not installed or not in PATH. "
+            "PDF to image conversion requires poppler-utils. "
+            "Install with: sudo apt-get install poppler-utils (Ubuntu/Debian) "
+            "or brew install poppler (macOS)"
+        )
+
     kwargs = {"dpi": dpi, "fmt": "RGB"}
     if password:
         kwargs["userpw"] = password
 
-    images = convert_from_bytes(pdf_content, **kwargs)
-    return images
+    try:
+        images = convert_from_bytes(pdf_content, **kwargs)
+        return images
+    except PDFInfoNotInstalledError:
+        raise RuntimeError(
+            "Poppler's pdfinfo utility is not found. "
+            "Please install poppler-utils: sudo apt-get install poppler-utils"
+        )
+    except Exception as e:
+        if "poppler" in str(e).lower() or "pdfinfo" in str(e).lower():
+            raise RuntimeError(
+                f"Poppler error: {str(e)}. "
+                "Ensure poppler-utils is installed and pdfinfo is in PATH."
+            )
+        raise
 
 
 def _extract_with_ocr(
@@ -308,6 +401,57 @@ async def root():
     return {"status": "ok", "message": "OCR Service is running"}
 
 
+@app.get("/health")
+async def health_check():
+    """
+    Detailed health check with dependency status.
+
+    Returns status of all required system dependencies:
+    - Tesseract OCR
+    - Poppler (for PDF to image conversion)
+    - Available OCR languages
+    """
+    dependencies = {
+        "tesseract": {
+            "installed": TESSERACT_AVAILABLE,
+            "version": TESSERACT_VERSION,
+            "languages": TESSERACT_LANGUAGES
+        },
+        "poppler": {
+            "installed": POPPLER_AVAILABLE,
+            "version": POPPLER_VERSION,
+            "required_for": "PDF OCR (force_ocr, OCR fallback)"
+        }
+    }
+
+    all_ok = TESSERACT_AVAILABLE and POPPLER_AVAILABLE
+
+    warnings = []
+    if not POPPLER_AVAILABLE:
+        warnings.append(
+            "Poppler is not installed. OCR features for PDFs will not work. "
+            "Install with: sudo apt-get install poppler-utils"
+        )
+    if not TESSERACT_AVAILABLE:
+        warnings.append(
+            "Tesseract is not installed. OCR will not work. "
+            "Install with: sudo apt-get install tesseract-ocr"
+        )
+
+    return JSONResponse({
+        "status": "ok" if all_ok else "degraded",
+        "message": "All dependencies available" if all_ok else "Some dependencies missing",
+        "dependencies": dependencies,
+        "warnings": warnings,
+        "features": {
+            "pdfplumber_extraction": True,
+            "pdf_ocr": POPPLER_AVAILABLE and TESSERACT_AVAILABLE,
+            "image_ocr": TESSERACT_AVAILABLE,
+            "image_preprocessing": True
+        }
+    })
+
+
 @app.post("/pdf")
 async def extract_from_pdf(
     file: UploadFile = File(..., description="PDF file to extract text from"),
@@ -345,6 +489,17 @@ async def extract_from_pdf(
     if not 0 <= ocr_psm <= 13:
         raise HTTPException(status_code=400, detail="ocr_psm must be between 0-13")
 
+    # Early check for poppler when force_ocr is requested
+    if force_ocr and not POPPLER_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "OCR is unavailable: poppler-utils is not installed on this server. "
+                "Either use pdfplumber extraction (remove force_ocr parameter) "
+                "or install poppler: sudo apt-get install poppler-utils"
+            )
+        )
+
     try:
         content = await file.read()
 
@@ -356,6 +511,7 @@ async def extract_from_pdf(
         extraction_method = "ocr" if force_ocr else "pdfplumber"
         ocr_pages = 0
         pdfplumber_pages = 0
+        ocr_fallback_skipped = False
 
         if force_ocr:
             # Force OCR extraction
@@ -371,17 +527,25 @@ async def extract_from_pdf(
 
             # Check if OCR fallback is needed
             if _needs_ocr_fallback(results, min_chars_threshold):
-                logger.info(f"Falling back to OCR for {file.filename}")
-                extraction_method = "ocr"
-                results, page_count = _extract_with_ocr(
-                    content, password, ocr_language, ocr_psm, ocr_dpi, preprocess_steps
-                )
-                ocr_pages = page_count
-                pdfplumber_pages = 0
+                if POPPLER_AVAILABLE:
+                    logger.info(f"Falling back to OCR for {file.filename}")
+                    extraction_method = "ocr"
+                    results, page_count = _extract_with_ocr(
+                        content, password, ocr_language, ocr_psm, ocr_dpi, preprocess_steps
+                    )
+                    ocr_pages = page_count
+                    pdfplumber_pages = 0
+                else:
+                    # Poppler not available, can't do OCR fallback
+                    logger.warning(
+                        f"OCR fallback needed for {file.filename} but poppler is not installed. "
+                        "Returning pdfplumber results."
+                    )
+                    ocr_fallback_skipped = True
 
         logger.info(f"Successfully extracted text from PDF: {file.filename} ({page_count} pages, method: {extraction_method})")
 
-        return JSONResponse({
+        response_data = {
             "status": "success",
             "type": "pdf",
             "filename": file.filename,
@@ -390,7 +554,17 @@ async def extract_from_pdf(
             "ocr_pages": ocr_pages,
             "pdfplumber_pages": pdfplumber_pages,
             "results": results
-        })
+        }
+
+        # Add warning if OCR fallback was skipped
+        if not force_ocr and ocr_fallback_skipped:
+            response_data["warning"] = (
+                "Document appears to be a scanned PDF but OCR fallback is unavailable. "
+                "poppler-utils is not installed on this server. "
+                "Results may be incomplete. Install poppler for full OCR support."
+            )
+
+        return JSONResponse(response_data)
 
     except Exception as e:
         logger.error(f"Error processing PDF: {str(e)}")
