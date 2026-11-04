@@ -17,4 +17,6 @@ def process_document(filename,data,media_type,include_raw_text=False):
       "processing":{"methods":result["methods"],"ocr_used":"tesseract_ocr" in result["methods"],"duration_ms":round((time.perf_counter()-start)*1000)},
       "warnings":result["warnings"]+([] if result["text"].strip() else ["No readable text was extracted."])}
     if include_raw_text: payload["raw_text"]=result["text"]
-    return DocumentResponse(**payload).dict()
+    response=DocumentResponse(**payload).dict()
+    if not include_raw_text: response.pop("raw_text",None)
+    return response
