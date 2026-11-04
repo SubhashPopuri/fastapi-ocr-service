@@ -599,3 +599,12 @@ Open `/docs` for Swagger UI.
 Example: `curl -X POST http://localhost:8000/v1/documents/process -F 'file=@invoice.pdf'`.
 
 See `docs/architecture.md` and `docs/security.md`. Rule-based extraction is a baseline and should be human-reviewed for ambiguous documents. Authentication, tenant isolation, malware scanning and production retention controls are not included in this first release.
+
+
+## PAN card extraction
+
+The document intelligence API recognizes Indian PAN cards as the `pan_card` document type. The current schema extracts the PAN number, cardholder name, printed father's/mother's name, date of birth and gender when visible. It derives the holder category from the fourth PAN character and validates the 10-character PAN structure.
+
+This is OCR and format validation only; it does not verify PAN allotment or identity against Income Tax Department records. PAN data is sensitive personal information. Use synthetic or properly authorized test documents, avoid enabling raw-text output in routine use, and apply appropriate access, retention and masking controls before production use.
+
+Test through Swagger at `/docs` using `POST /v1/documents/process`. The PAN schema is also listed by `GET /v1/documents/schemas` and available at `GET /v1/documents/schemas/pan_card`.
