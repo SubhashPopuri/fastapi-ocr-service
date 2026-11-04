@@ -44,6 +44,10 @@ class DocumentResponse(BaseModel):
     pages:List[Dict[str,Any]]=Field(default_factory=list)
     validation:ValidationResult
     review_required:bool=False
+    completeness:Dict[str,Any]=Field(default_factory=dict)
+    quality:Dict[str,Any]=Field(default_factory=dict)
+    processing_decision:Dict[str,Any]=Field(default_factory=dict)
+    pipeline_version:str="1.0.0"
     processing:ProcessingMetadata
     warnings:List[str]=Field(default_factory=list)
     raw_text:Optional[str]=None
