@@ -7,5 +7,6 @@ class Settings:
     ocr_dpi=int(os.getenv("DOCINTEL_OCR_DPI","250"))
     ocr_language=os.getenv("DOCINTEL_OCR_LANGUAGE","eng")
     tesseract_cmd=os.getenv("TESSERACT_CMD","")
+    review_ocr_confidence_threshold=float(os.getenv("DOCINTEL_REVIEW_OCR_CONFIDENCE_THRESHOLD","70"))
 settings=Settings()
 def get_settings(): return settings
