@@ -24,13 +24,15 @@ async def require_api_key(api_key: str | None = Security(_api_key_header)):
         raise HTTPException(status_code=401, detail="Missing or invalid API key.")
 
 
-router = APIRouter(
-    tags=["Document Intelligence"],
+# Keep health checks public so Render can verify the service without a secret.
+router = APIRouter(tags=["Document Intelligence"])
+
+
+@router.post(
+    "/v1/documents/process",
+    summary="Process PDF, image, Word, Excel, CSV or text file",
     dependencies=[Security(require_api_key)],
 )
-
-
-@router.post("/v1/documents/process", summary="Process PDF, image, Word, Excel, CSV or text file")
 async def process(
     file: UploadFile = File(...),
     include_raw_text: bool = Query(False, description="Return full extracted text; disabled by default"),
@@ -48,19 +50,19 @@ async def process(
         await file.close()
 
 
-@router.get("/v1/documents/schemas")
+@router.get("/v1/documents/schemas", dependencies=[Security(require_api_key)])
 def schemas():
     return {"schemas": list_schemas()}
 
 
-@router.get("/v1/documents/schemas/{document_type}")
+@router.get("/v1/documents/schemas/{document_type}", dependencies=[Security(require_api_key)])
 def schema(document_type: str):
     if document_type not in SCHEMAS:
         raise HTTPException(404, "Unknown document type.")
     return {"document_type": document_type, **SCHEMAS[document_type]}
 
 
-@router.get("/v1/system/capabilities")
+@router.get("/v1/system/capabilities", dependencies=[Security(require_api_key)])
 def capabilities():
     s = get_settings()
     return {
