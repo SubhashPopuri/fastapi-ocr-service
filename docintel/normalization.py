@@ -11,7 +11,7 @@ AMOUNT_FIELDS = {
 }
 DATE_FIELDS = {
     "invoice_date", "due_date", "po_date", "effective_date", "expiry_date",
-    "document_date",
+    "document_date", "date_of_birth",
 }
 
 
@@ -23,6 +23,13 @@ def normalize_value(field, value):
         return None
     if field == "email":
         return raw.lower()
+    if field == "pan_number":
+        candidate = re.sub(r"[\s-]", "", raw).upper()
+        return candidate if re.fullmatch(r"[A-Z]{5}[0-9]{4}[A-Z]", candidate) else None
+    if field == "gender":
+        normalized = raw.strip().lower()
+        return {"m": "male", "male": "male", "f": "female", "female": "female",
+                "t": "transgender", "transgender": "transgender"}.get(normalized)
     if field == "phone":
         digits = re.sub(r"\D", "", raw)
         if len(digits) == 12 and digits.startswith("91"):
@@ -37,30 +44,21 @@ def normalize_value(field, value):
         except (InvalidOperation, ValueError):
             return None
     if field in DATE_FIELDS:
-        # ISO and year-first formats are unambiguous.
         for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
             try:
                 return datetime.strptime(raw, fmt).date().isoformat()
             except ValueError:
                 pass
-
-        # Month-name formats such as 04-Nov-2026 are unambiguous.
         for fmt in ("%d-%b-%Y", "%d-%B-%Y", "%d %b %Y", "%d %B %Y",
-                    "%b %d, %Y", "%B %d, %Y"):
-            try:
-                return datetime.strptime(raw, fmt).date().isoformat()
-            except ValueError:
-                pass
-
-        # Numeric day/month formats are accepted only when the ordering is clear.
-        for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%d-%m-%y"):
+                    "%b %d, %Y", "%B %d, %Y", "%d/%m/%Y", "%d-%m-%Y"):
             try:
                 parsed = datetime.strptime(raw, fmt)
-                parts = re.split(r"[/-]", raw)
-                if int(parts[0]) <= 12 and int(parts[1]) <= 12:
-                    return None
+                parts = re.split(r"[/ -]", raw)
+                if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
+                    if int(parts[0]) <= 12 and int(parts[1]) <= 12:
+                        return None
                 return parsed.date().isoformat()
-            except (ValueError, IndexError):
+            except ValueError:
                 pass
         return None
     return re.sub(r"\s+", " ", raw).strip() or None
