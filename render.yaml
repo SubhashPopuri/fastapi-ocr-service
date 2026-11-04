@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: document-intelligence-api
+    runtime: docker
+    plan: starter
+    region: singapore
+    branch: implementation/document-intelligence-platform
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    healthCheckPath: /ready
+    envVars:
+      - key: DOCINTEL_API_KEY
+        generateValue: true
+      - key: DOCINTEL_REVIEW_OCR_CONFIDENCE_THRESHOLD
+        value: "70"
+      - key: DOCINTEL_MAX_UPLOAD_BYTES
+        value: "15728640"
+      - key: DOCINTEL_MAX_PDF_PAGES
+        value: "30"
+      - key: DOCINTEL_MAX_IMAGE_PIXELS
+        value: "25000000"
