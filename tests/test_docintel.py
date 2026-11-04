@@ -110,3 +110,25 @@ def test_financial_reconciliation_flags_mismatch():
     }
     validation = validate_fields(fields, "invoice")
     assert any(w["code"] == "grand_total_mismatch" for w in validation["warnings"])
+
+
+def test_tax_rate_percentage_is_not_included_in_tax_amount():
+    text = (
+        "Invoice Number: INV-2026-1042\n"
+        "Subtotal: INR 105,000.00\n"
+        "CGST (9%) INR 9,450.00\n"
+        "SGST (9%) INR 9,450.00\n"
+        "Grand Total: INR 123,900.00"
+    )
+    fields = extract_fields(text, "invoice", [{"page": 1, "text": text}])
+    assert fields["cgst_amount"]["value"] == "9,450.00"
+    assert fields["cgst_amount"]["normalized_value"] == "9450.00"
+    assert fields["sgst_amount"]["normalized_value"] == "9450.00"
+    validation = validate_fields(fields, "invoice")
+    assert not any(w["code"] == "grand_total_mismatch" for w in validation["warnings"])
+
+
+def test_bill_to_block_source_page_is_resolved():
+    text = "TAX INVOICE\nInvoice Number: INV-2\nBILL TO\nDemo Customer Private Limited"
+    fields = extract_fields(text, "invoice", [{"page": 1, "text": text}])
+    assert fields["customer_name"]["source"]["page"] == 1
