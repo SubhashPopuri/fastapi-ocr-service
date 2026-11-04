@@ -23,6 +23,17 @@ SCHEMAS = {
             "currency": ["currency"],
         },
     },
+    "pan_card": {
+        "version": "1.0",
+        "required": ["pan_number"],
+        "fields": {
+            "pan_number": ["permanent account number", "pan number", "pan no", "pan"],
+            "full_name": ["name", "cardholder name", "name of holder"],
+            "parent_name": ["father's name", "father name", "mother's name", "mother name", "parent name"],
+            "date_of_birth": ["date of birth", "dob"],
+            "gender": ["gender", "sex"],
+        },
+    },
     "purchase_order": {
         "version": "1.0", "required": ["po_number"],
         "fields": {
