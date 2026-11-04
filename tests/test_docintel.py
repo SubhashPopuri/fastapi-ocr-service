@@ -196,3 +196,55 @@ def test_pan_card_extracts_unlabelled_names_and_standalone_dob_from_ocr_layout()
     validation = validate_fields(fields, "pan_card")
     assert not validation["is_valid"]
     assert any(error["code"] == "pan_invalid_holder_type" for error in validation["errors"])
+
+
+def test_pan_missing_expected_dob_requires_review():
+    result = process_document(
+        "pan.txt",
+        b"INCOME TAX DEPARTMENT\\nPERMANENT ACCOUNT NUMBER CARD\\nABCPP1234D\\nName: SAMPLE PERSON\\nFather's Name: SAMPLE PARENT",
+        "text/plain",
+    )
+    assert result["completeness"]["missing_fields"] == ["date_of_birth"]
+    assert result["processing_decision"]["status"] == "REVIEW_REQUIRED"
+    assert "EXPECTED_FIELDS_MISSING" in result["processing_decision"]["reason_codes"]
+    assert result["review_required"] is True
+
+
+def test_pan_complete_fields_with_low_ocr_quality_requires_review(monkeypatch):
+    from docintel import pipeline
+    original = pipeline.process_other
+
+    def low_confidence_processor(data, suffix):
+        result = original(data, suffix)
+        result["pages"][0]["ocr_confidence"] = 59.05
+        return result
+
+    monkeypatch.setattr(pipeline, "process_other", low_confidence_processor)
+    result = process_document(
+        "pan.txt",
+        b"INCOME TAX DEPARTMENT\\nPERMANENT ACCOUNT NUMBER CARD\\nABCPP1234D\\nName: SAMPLE PERSON\\nFather's Name: SAMPLE PARENT\\nDate of Birth: 19/11/1990",
+        "text/plain",
+    )
+    assert result["completeness"]["missing_fields"] == []
+    assert result["processing_decision"]["status"] == "REVIEW_REQUIRED"
+    assert "LOW_DOCUMENT_OCR_QUALITY" in result["processing_decision"]["reason_codes"]
+
+
+def test_pan_complete_fields_high_quality_can_auto_accept(monkeypatch):
+    from docintel import pipeline
+    original = pipeline.process_other
+
+    def high_confidence_processor(data, suffix):
+        result = original(data, suffix)
+        result["pages"][0]["ocr_confidence"] = 92.0
+        return result
+
+    monkeypatch.setattr(pipeline, "process_other", high_confidence_processor)
+    result = process_document(
+        "pan.txt",
+        b"INCOME TAX DEPARTMENT\\nPERMANENT ACCOUNT NUMBER CARD\\nABCPP1234D\\nName: SAMPLE PERSON\\nFather's Name: SAMPLE PARENT\\nDate of Birth: 19/11/1990",
+        "text/plain",
+    )
+    assert result["completeness"]["missing_fields"] == []
+    assert result["processing_decision"]["status"] == "AUTO_ACCEPT"
+    assert result["review_required"] is False
