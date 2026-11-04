@@ -70,7 +70,7 @@ def process_other(data,suffix):
                     for item in value: flatten(item,prefix)
                 elif prefix:
                     lines.append(f"{prefix}: {value}")
-            flatten(parsed); text="\\n".join(lines) if lines else json.dumps(parsed,ensure_ascii=False,indent=2)
+            flatten(parsed); text="\n".join(lines) if lines else json.dumps(parsed,ensure_ascii=False,indent=2)
         except json.JSONDecodeError: text=raw
     elif suffix==".xml":
         raw=data.decode("utf-8-sig",errors="replace")
@@ -80,7 +80,7 @@ def process_other(data,suffix):
                 if element.text and element.text.strip():
                     label=element.tag.split("}")[-1].replace("_"," ")
                     lines.append(f"{label}: {element.text.strip()}")
-            text="\\n".join(lines)
+            text="\n".join(lines)
         except ET.ParseError: text=raw
     elif suffix in {".html",".htm"}:
         class TextExtractor(HTMLParser):
