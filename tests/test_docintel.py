@@ -182,9 +182,9 @@ def test_existing_invoice_schema_and_classification_remain_available():
 def test_pan_card_extracts_unlabelled_names_and_standalone_dob_from_ocr_layout():
     # Tesseract output observed from a scanned PAN card with no name labels.
     text = (
-        "RAHUL GUPTA\\nSURESH GUPTA\\n\\n"
-        "23/11/1974\\nPermanent Account Number\\n\\n"
-        "ABCDE1234F\\n\\nSAMPLE - IMMIHELP.COM\\nSignature"
+        "RAHUL GUPTA\nSURESH GUPTA\n\n"
+        "23/11/1974\nPermanent Account Number\n\n"
+        "ABCDE1234F\n\nSAMPLE - IMMIHELP.COM\nSignature"
     )
     fields = extract_fields(text, "pan_card", [{"page": 1, "text": text}])
     assert fields["full_name"]["value"] == "RAHUL GUPTA"
