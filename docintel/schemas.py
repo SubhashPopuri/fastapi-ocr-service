@@ -26,6 +26,7 @@ SCHEMAS = {
     "pan_card": {
         "version": "1.0",
         "required": ["pan_number"],
+        "expected": ["pan_number", "full_name", "parent_name", "date_of_birth"],
         "fields": {
             "pan_number": ["permanent account number", "pan number", "pan no", "pan"],
             "full_name": ["name", "cardholder name", "name of holder"],
