@@ -201,7 +201,7 @@ def test_pan_card_extracts_unlabelled_names_and_standalone_dob_from_ocr_layout()
 def test_pan_missing_expected_dob_requires_review():
     result = process_document(
         "pan.txt",
-        b"INCOME TAX DEPARTMENT\\nPERMANENT ACCOUNT NUMBER CARD\\nABCPP1234D\\nName: SAMPLE PERSON\\nFather's Name: SAMPLE PARENT",
+        b"INCOME TAX DEPARTMENT\nPERMANENT ACCOUNT NUMBER CARD\nABCPP1234D\nName: SAMPLE PERSON\nFather's Name: SAMPLE PARENT",
         "text/plain",
     )
     assert result["completeness"]["missing_fields"] == ["date_of_birth"]
@@ -222,7 +222,7 @@ def test_pan_complete_fields_with_low_ocr_quality_requires_review(monkeypatch):
     monkeypatch.setattr(pipeline, "process_other", low_confidence_processor)
     result = process_document(
         "pan.txt",
-        b"INCOME TAX DEPARTMENT\\nPERMANENT ACCOUNT NUMBER CARD\\nABCPP1234D\\nName: SAMPLE PERSON\\nFather's Name: SAMPLE PARENT\\nDate of Birth: 19/11/1990",
+        b"INCOME TAX DEPARTMENT\nPERMANENT ACCOUNT NUMBER CARD\nABCPP1234D\nName: SAMPLE PERSON\nFather's Name: SAMPLE PARENT\nDate of Birth: 19/11/1990",
         "text/plain",
     )
     assert result["completeness"]["missing_fields"] == []
@@ -242,7 +242,7 @@ def test_pan_complete_fields_high_quality_can_auto_accept(monkeypatch):
     monkeypatch.setattr(pipeline, "process_other", high_confidence_processor)
     result = process_document(
         "pan.txt",
-        b"INCOME TAX DEPARTMENT\\nPERMANENT ACCOUNT NUMBER CARD\\nABCPP1234D\\nName: SAMPLE PERSON\\nFather's Name: SAMPLE PARENT\\nDate of Birth: 19/11/1990",
+        b"INCOME TAX DEPARTMENT\nPERMANENT ACCOUNT NUMBER CARD\nABCPP1234D\nName: SAMPLE PERSON\nFather's Name: SAMPLE PARENT\nDate of Birth: 19/11/1990",
         "text/plain",
     )
     assert result["completeness"]["missing_fields"] == []
