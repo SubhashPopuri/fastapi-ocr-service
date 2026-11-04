@@ -61,11 +61,26 @@ def process_other(data,suffix):
         text=data.decode("utf-8-sig",errors="replace")
     elif suffix==".json":
         raw=data.decode("utf-8-sig",errors="replace")
-        try: text=json.dumps(json.loads(raw),ensure_ascii=False,indent=2)
+        try:
+            parsed=json.loads(raw); lines=[]
+            def flatten(value,prefix=""):
+                if isinstance(value,dict):
+                    for key,item in value.items(): flatten(item,str(key).replace("_"," "))
+                elif isinstance(value,list):
+                    for item in value: flatten(item,prefix)
+                elif prefix:
+                    lines.append(f"{prefix}: {value}")
+            flatten(parsed); text="\\n".join(lines) if lines else json.dumps(parsed,ensure_ascii=False,indent=2)
         except json.JSONDecodeError: text=raw
     elif suffix==".xml":
         raw=data.decode("utf-8-sig",errors="replace")
-        try: text=" ".join(part.strip() for part in ET.fromstring(raw).itertext() if part.strip())
+        try:
+            root=ET.fromstring(raw); lines=[]
+            for element in root.iter():
+                if element.text and element.text.strip():
+                    label=element.tag.split("}")[-1].replace("_"," ")
+                    lines.append(f"{label}: {element.text.strip()}")
+            text="\\n".join(lines)
         except ET.ParseError: text=raw
     elif suffix in {".html",".htm"}:
         class TextExtractor(HTMLParser):
