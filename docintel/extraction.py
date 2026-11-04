@@ -184,16 +184,16 @@ def _find_pan_dob(text):
     """Find a real calendar date near the PAN DOB label, ignoring OCR debris."""
     lines = text.splitlines()
     label_index = next(
-        (i for i, line in enumerate(lines) if re.search(r"date\\s+of\\s+birth|\\bdob\\b", line, re.I)),
+        (i for i, line in enumerate(lines) if re.search(r"date\s+of\s+birth|\bdob\b", line, re.I)),
         None,
     )
     # Prefer dates after the DOB label; a fallback scan supports layouts where
     # OCR drops the label but reads the date itself.
     search_lines = lines[label_index:] if label_index is not None else lines
-    date_pattern = re.compile(r"(?<!\\d)(\\d{1,2}\\s*[/.-]\\s*\\d{1,2}\\s*[/.-]\\s*\\d{4}|\\d{4}\\s*[/.-]\\s*\\d{1,2}\\s*[/.-]\\s*\\d{1,2})(?!\\d)")
+    date_pattern = re.compile(r"(?<!\d)(\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{4}|\d{4}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{1,2})(?!\d)")
     for line in search_lines:
         for match in date_pattern.finditer(line):
-            candidate = re.sub(r"\\s+", "", match.group(1))
+            candidate = re.sub(r"\s+", "", match.group(1))
             for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d"):
                 try:
                     datetime.strptime(candidate, fmt)
