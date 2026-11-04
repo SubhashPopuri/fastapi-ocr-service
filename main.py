@@ -16,8 +16,9 @@ import shutil
 
 # Configure pytesseract to find tesseract binary
 import os
-os.environ['TESSERACT_CMD'] = '/usr/bin/tesseract'
-pytesseract.pytesseract.pytesseract_cmd = '/usr/bin/tesseract'
+_tesseract_cmd = os.getenv("TESSERACT_CMD") or shutil.which("tesseract") or "/usr/bin/tesseract"
+os.environ["TESSERACT_CMD"] = _tesseract_cmd
+pytesseract.pytesseract.pytesseract_cmd = _tesseract_cmd
 
 app = FastAPI(title="Document Intelligence Platform", description="OCR and structured document processing APIs")
 
