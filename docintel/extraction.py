@@ -146,6 +146,39 @@ def _clean_pan_name_candidate(value):
     return str(value).strip()
 
 
+def _find_pan_label(text, labels, exclude_labels=()):
+    """Find PAN values under bilingual labels, including OCR lines with Hindi prefixes.
+
+    A value may appear after the label on the same line or on the next
+    non-empty line. Exclusion labels prevent the generic 'Name' label from
+    matching 'Father's Name' or 'Mother's Name'.
+    """
+    lines = [line.strip() for line in text.splitlines()]
+    label_patterns = [
+        re.compile(r"(?<![A-Za-z])" + re.escape(label) + r"(?![A-Za-z])", re.I)
+        for label in sorted(labels, key=len, reverse=True)
+    ]
+    excluded_patterns = [
+        re.compile(r"(?<![A-Za-z])" + re.escape(label) + r"(?![A-Za-z])", re.I)
+        for label in exclude_labels
+    ]
+    for index, line in enumerate(lines):
+        if not line:
+            continue
+        if any(pattern.search(line) for pattern in excluded_patterns):
+            continue
+        match = next((pattern.search(line) for pattern in label_patterns if pattern.search(line)), None)
+        if not match:
+            continue
+        remainder = line[match.end():].strip(" :|#-—")
+        if remainder:
+            return remainder, line
+        for following in lines[index + 1:]:
+            if following:
+                return following, line + " | " + following
+    return None, None
+
+
 def _extract_pan_fields(text, pages, fields):
     if "pan_number" not in fields:
         match = re.search(PAN, text, re.I)
@@ -158,15 +191,21 @@ def _extract_pan_fields(text, pages, fields):
             fields["holder_category"] = _field(PAN_HOLDER_TYPES[candidate[3]], candidate, pages, "pan_structure")
     # PAN cards commonly print the name and parent name as standalone lines after their labels.
     if "full_name" not in fields:
-        name, evidence = _find(text, ["name of holder", "cardholder name", "name"])
+        name, evidence = _find_pan_label(
+            text,
+            ["name of holder", "cardholder name", "name"],
+            exclude_labels=["father's name", "father name", "mother's name", "mother name", "parent name"],
+        )
         if name:
             fields["full_name"] = _field(name, evidence, pages, "pan_label")
     if "parent_name" not in fields:
-        parent, evidence = _find(text, ["father's name", "father name", "mother's name", "mother name", "parent name"])
+        parent, evidence = _find_pan_label(
+            text, ["father's name", "father name", "mother's name", "mother name", "parent name"]
+        )
         if parent:
             fields["parent_name"] = _field(parent, evidence, pages, "pan_label")
     if "date_of_birth" not in fields:
-        dob, evidence = _find(text, ["date of birth", "dob"])
+        dob, evidence = _find_pan_label(text, ["date of birth", "dob"])
         if dob:
             fields["date_of_birth"] = _field(dob, evidence, pages, "pan_label")
     if "gender" not in fields:
