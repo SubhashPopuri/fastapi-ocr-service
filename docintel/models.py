@@ -8,6 +8,7 @@ class SourceEvidence(BaseModel):
     bounding_box:Optional[Dict[str,float]]=None
 class ExtractedField(BaseModel):
     value:Any=None
+    normalized_value:Any=None
     confidence:Optional[float]=None
     source:Optional[SourceEvidence]=None
     validation_status:str="not_checked"
@@ -16,6 +17,7 @@ class Classification(BaseModel):
     document_type:str
     method:str="rules"
     confidence:Optional[float]=None
+    rule_strength:Optional[float]=None
     evidence:List[str]=Field(default_factory=list)
     review_required:bool=False
 class ValidationResult(BaseModel):
@@ -39,6 +41,7 @@ class DocumentResponse(BaseModel):
     classification:Classification
     extracted_data:Dict[str,ExtractedField]
     tables:List[Dict[str,Any]]=Field(default_factory=list)
+    pages:List[Dict[str,Any]]=Field(default_factory=list)
     validation:ValidationResult
     review_required:bool=False
     processing:ProcessingMetadata
