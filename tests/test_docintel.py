@@ -132,3 +132,48 @@ def test_bill_to_block_source_page_is_resolved():
     text = "TAX INVOICE\nInvoice Number: INV-2\nBILL TO\nDemo Customer Private Limited"
     fields = extract_fields(text, "invoice", [{"page": 1, "text": text}])
     assert fields["customer_name"]["source"]["page"] == 1
+
+
+def test_pan_card_classification_and_extraction():
+    text = (
+        "INCOME TAX DEPARTMENT\nPERMANENT ACCOUNT NUMBER CARD\n"
+        "PAN: ABCPP1234D\nName: SUBHASH POPURI\n"
+        "Father's Name: POPURI RAMA RAO\nDate of Birth: 19/11/1990\nGender: Male"
+    )
+    result = classify(text)
+    assert result["document_type"] == "pan_card"
+    fields = extract_fields(text, "pan_card", [{"page": 1, "text": text}])
+    assert fields["pan_number"]["value"] == "ABCPP1234D"
+    assert fields["pan_number"]["normalized_value"] == "ABCPP1234D"
+    assert fields["full_name"]["value"] == "SUBHASH POPURI"
+    assert fields["parent_name"]["value"] == "POPURI RAMA RAO"
+    assert fields["date_of_birth"]["normalized_value"] == "1990-11-19"
+    assert fields["gender"]["normalized_value"] == "male"
+    assert fields["holder_category"]["value"] == "individual"
+    validation = validate_fields(fields, "pan_card")
+    assert validation["is_valid"]
+    assert not validation["errors"]
+
+
+def test_pan_card_without_explicit_pan_label_uses_pattern_fallback():
+    text = "PERMANENT ACCOUNT NUMBER\nABCPP1234D\nNAME: SAMPLE PERSON"
+    fields = extract_fields(text, "pan_card", [{"page": 1, "text": text}])
+    assert fields["pan_number"]["value"] == "ABCPP1234D"
+
+
+def test_pan_validation_rejects_invalid_holder_category():
+    fields = extract_fields(
+        "PAN: ABCXQ1234D",
+        "pan_card",
+        [{"page": 1, "text": "PAN: ABCXQ1234D"}],
+    )
+    result = validate_fields(fields, "pan_card")
+    assert not result["is_valid"]
+    assert any(error["code"] == "pan_invalid_holder_type" for error in result["errors"])
+
+
+def test_existing_invoice_schema_and_classification_remain_available():
+    from docintel.schemas import SCHEMAS
+    assert "invoice" in SCHEMAS
+    assert classify("TAX INVOICE Invoice Number: INV-1 Amount Due: 100")["document_type"] == "invoice"
+    assert "pan_card" in SCHEMAS
