@@ -2,6 +2,7 @@
 from io import BytesIO
 import csv
 import json
+import re
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 import pdfplumber
@@ -81,10 +82,10 @@ def process_image(data):
     image = Image.open(BytesIO(data))
     text, confidence = _ocr(image)
     # Only run the extra crop pass when the initial OCR suggests a PAN card.
-    if "permanent account number" in text.lower() or __import__("re").search(r"\\b[A-Z]{5}[0-9]{4}[A-Z]\\b", text, __import__("re").I):
+    if "permanent account number" in text.lower() or re.search(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b", text, re.I):
         supplemental = _pan_supplemental_ocr(image)
         if supplemental:
-            text = text + "\\n\\n" + supplemental
+            text = text + "\n\n" + supplemental
     return {"text":text,"pages":[{"page":1,"text":text,"method":"tesseract_ocr","ocr_confidence":confidence}],"page_count":1,"tables":[],"methods":["tesseract_ocr"],"warnings":[]}
 
 def process_other(data,suffix):
