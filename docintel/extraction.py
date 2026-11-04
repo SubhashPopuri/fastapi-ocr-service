@@ -151,6 +151,37 @@ def _extract_pan_fields(text, pages, fields):
             if normalized:
                 fields["gender"] = _field(gender, evidence, pages, "pan_label")
 
+    # Many physical PAN cards have no printed labels beside the holder and
+    # parent names. OCR therefore returns two name lines followed by a
+    # standalone DOB. Use this conservative layout fallback only when labels
+    # did not yield the corresponding fields.
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    dob_pattern = re.compile(r"^(\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}|\\d{4}[/-]\\d{1,2}[/-]\\d{1,2})$")
+    dob_index = next((i for i, line in enumerate(lines) if dob_pattern.fullmatch(line)), None)
+    if dob_index is not None:
+        dob_line = lines[dob_index]
+        if "date_of_birth" not in fields:
+            fields["date_of_birth"] = _field(dob_line, dob_line, pages, "pan_layout_dob")
+        if "full_name" not in fields or "parent_name" not in fields:
+            excluded = re.compile(
+                r"\\b(income tax|department|government|govt|india|permanent|account|number|"
+                r"signature|sample|imm[i1]help)\\b", re.I
+            )
+            name_candidates = [
+                (i, line) for i, line in enumerate(lines[:dob_index])
+                if len(line) <= 100
+                and re.fullmatch(r"[A-Za-z][A-Za-z .'-]{2,}", line)
+                and len(line.split()) >= 2
+                and not excluded.search(line)
+            ]
+            if "full_name" not in fields and name_candidates:
+                index, value = name_candidates[-2] if len(name_candidates) >= 2 else name_candidates[-1]
+                fields["full_name"] = _field(value, value, pages, "pan_layout_name")
+            if "parent_name" not in fields and len(name_candidates) >= 2:
+                index, value = name_candidates[-1]
+                if "full_name" not in fields or value != fields["full_name"]["value"]:
+                    fields["parent_name"] = _field(value, value, pages, "pan_layout_parent_name")
+
 
 def _extract_line_items(tables, pages):
     items = []
