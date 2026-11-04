@@ -180,6 +180,29 @@ def _find_pan_label(text, labels, exclude_labels=()):
     return None, None
 
 
+def _find_pan_dob(text):
+    """Find a real calendar date near the PAN DOB label, ignoring OCR debris."""
+    lines = text.splitlines()
+    label_index = next(
+        (i for i, line in enumerate(lines) if re.search(r"date\\s+of\\s+birth|\\bdob\\b", line, re.I)),
+        None,
+    )
+    # Prefer dates after the DOB label; a fallback scan supports layouts where
+    # OCR drops the label but reads the date itself.
+    search_lines = lines[label_index:] if label_index is not None else lines
+    date_pattern = re.compile(r"(?<!\\d)(\\d{1,2}\\s*[/.-]\\s*\\d{1,2}\\s*[/.-]\\s*\\d{4}|\\d{4}\\s*[/.-]\\s*\\d{1,2}\\s*[/.-]\\s*\\d{1,2})(?!\\d)")
+    for line in search_lines:
+        for match in date_pattern.finditer(line):
+            candidate = re.sub(r"\\s+", "", match.group(1))
+            for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d"):
+                try:
+                    datetime.strptime(candidate, fmt)
+                    return candidate, line.strip()
+                except ValueError:
+                    pass
+    return None, None
+
+
 def _extract_pan_fields(text, pages, fields):
     if "pan_number" not in fields:
         match = re.search(PAN, text, re.I)
@@ -205,10 +228,23 @@ def _extract_pan_fields(text, pages, fields):
         )
         if parent:
             fields["parent_name"] = _field(parent, evidence, pages, "pan_label")
-    if "date_of_birth" not in fields:
-        dob, evidence = _find_pan_label(text, ["date of birth", "dob"])
-        if dob:
-            fields["date_of_birth"] = _field(dob, evidence, pages, "pan_label")
+    # The generic schema matcher can mistake OCR punctuation (for example
+    # "= <") for a DOB value. Replace missing or malformed values only when
+    # a calendar-valid date can be found in the PAN DOB region.
+    dob, evidence = _find_pan_dob(text)
+    if dob:
+        existing = fields.get("date_of_birth", {}).get("value")
+        existing_valid = False
+        if existing:
+            for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d"):
+                try:
+                    datetime.strptime(str(existing).strip(), fmt)
+                    existing_valid = True
+                    break
+                except ValueError:
+                    pass
+        if not existing_valid:
+            fields["date_of_birth"] = _field(dob, evidence, pages, "pan_dob_pattern")
     if "gender" not in fields:
         gender, evidence = _find(text, ["gender", "sex"])
         if gender:
