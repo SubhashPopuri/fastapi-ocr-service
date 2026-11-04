@@ -570,3 +570,32 @@ curl -X POST "http://localhost:8000/image?preprocess=upscale,grayscale,denoise,d
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+
+---
+
+# Document Intelligence Platform (v1)
+
+This repository also exposes a generic document processing API for PDF (digital and scanned), PNG/JPG/TIFF/BMP, DOCX, XLSX, CSV and TXT files. It classifies common document types, extracts schema-guided fields and tables, validates required fields, and returns canonical JSON. Full extracted text is opt-in.
+
+## Run
+
+Install system dependencies on Ubuntu/Codespaces: `sudo apt-get update && sudo apt-get install -y tesseract-ocr poppler-utils`.
+
+Install Python packages: `pip install -r requirements.txt`.
+
+Start: `uvicorn main:app --reload --host 0.0.0.0 --port 8000`.
+
+Open `/docs` for Swagger UI.
+
+## New endpoints
+
+- `POST /v1/documents/process` (multipart `file`; optional `include_raw_text=true`)
+- `GET /v1/documents/schemas`
+- `GET /v1/documents/schemas/{document_type}`
+- `GET /v1/system/capabilities`
+- `GET /ready`
+
+Example: `curl -X POST http://localhost:8000/v1/documents/process -F 'file=@invoice.pdf'`.
+
+See `docs/architecture.md` and `docs/security.md`. Rule-based extraction is a baseline and should be human-reviewed for ambiguous documents. Authentication, tenant isolation, malware scanning and production retention controls are not included in this first release.

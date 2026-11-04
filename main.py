@@ -19,7 +19,10 @@ import os
 os.environ['TESSERACT_CMD'] = '/usr/bin/tesseract'
 pytesseract.pytesseract.pytesseract_cmd = '/usr/bin/tesseract'
 
-app = FastAPI(title="OCR Service", description="Extract text from PDFs and images")
+app = FastAPI(title="Document Intelligence Platform", description="OCR and structured document processing APIs")
+
+from docintel.api import router as document_intelligence_router
+app.include_router(document_intelligence_router)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

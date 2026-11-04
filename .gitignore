@@ -30,3 +30,8 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local virtual environments and test artifacts
+.venv*/
+.pytest_cache/
+.coverage
