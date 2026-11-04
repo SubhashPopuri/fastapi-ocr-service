@@ -24,6 +24,32 @@ def _ocr(image):
         except (ValueError,TypeError): pass
     return text.strip(),round(sum(scores)/len(scores),2) if scores else None
 
+def _pan_supplemental_ocr(image):
+    """Read the left-side PAN identity fields with a layout-aware OCR pass.
+
+    Full-card OCR can miss small labels and values because of the portrait,
+    hologram and security background. This focused pass supplements rather
+    than replaces the original full-page OCR text.
+    """
+    image = image.convert("RGB")
+    width, height = image.size
+    # Name, parent name and DOB are conventionally grouped on the left half
+    # of Indian PAN cards. Crop with proportional coordinates for varied sizes.
+    crop = image.crop((
+        int(width * 0.025), int(height * 0.22),
+        int(width * 0.62), int(height * 0.49),
+    ))
+    scale = 2 if crop.width < 1800 else 1
+    if scale > 1:
+        crop = crop.resize((crop.width * scale, crop.height * scale))
+    try:
+        return pytesseract.image_to_string(
+            crop, lang=get_settings().ocr_language, config="--psm 6", timeout=30
+        ).strip()
+    except Exception:
+        return ""
+
+
 def process_pdf(data):
     pages=[]; tables=[]; methods=[]; warnings=[]
     with pdfplumber.open(BytesIO(data)) as pdf:
@@ -52,7 +78,13 @@ def process_pdf(data):
     return {"text":"\n\n".join(page["text"] for page in pages),"pages":pages,"page_count":len(pages),"tables":tables,"methods":sorted(set(methods)),"warnings":warnings}
 
 def process_image(data):
-    text,confidence=_ocr(Image.open(BytesIO(data)))
+    image = Image.open(BytesIO(data))
+    text, confidence = _ocr(image)
+    # Only run the extra crop pass when the initial OCR suggests a PAN card.
+    if "permanent account number" in text.lower() or __import__("re").search(r"\\b[A-Z]{5}[0-9]{4}[A-Z]\\b", text, __import__("re").I):
+        supplemental = _pan_supplemental_ocr(image)
+        if supplemental:
+            text = text + "\\n\\n" + supplemental
     return {"text":text,"pages":[{"page":1,"text":text,"method":"tesseract_ocr","ocr_confidence":confidence}],"page_count":1,"tables":[],"methods":["tesseract_ocr"],"warnings":[]}
 
 def process_other(data,suffix):
