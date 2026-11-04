@@ -336,7 +336,9 @@ def extract_fields(text, document_type, pages, tables=None):
     for key, labels in schema["fields"].items():
         # PAN numbers must be extracted with the strict 10-character pattern below.
         # Generic label matching can mistake "CARD" in the heading for the PAN value.
-        if document_type == "pan_card" and key == "pan_number":
+        if document_type == "pan_card" and key in {"pan_number", "date_of_birth"}:
+            # PAN DOB must pass the strict calendar-date parser below.
+            # Generic label matching can capture OCR debris such as "= <".
             continue
         value, evidence = _find(text, labels)
         if value:
