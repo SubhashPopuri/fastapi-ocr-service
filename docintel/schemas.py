@@ -32,6 +32,7 @@ SCHEMAS = {
             "parent_name": ["father's name", "father name", "mother's name", "mother name", "parent name"],
             "date_of_birth": ["date of birth", "dob"],
             "gender": ["gender", "sex"],
+            "holder_category": ["holder category"],
         },
     },
     "purchase_order": {
