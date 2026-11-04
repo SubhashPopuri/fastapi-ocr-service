@@ -121,6 +121,31 @@ def _extract_invoice_parties(text, pages, fields):
                     break
 
 
+def _clean_pan_name_candidate(value):
+    """Remove obvious OCR spillover from uppercase PAN-card name lines.
+
+    Printed PAN holder names are commonly uppercase. When two or more
+    uppercase name tokens are followed by mixed/lowercase OCR fragments,
+    retain the uppercase name portion rather than treating the fragments
+    as additional name tokens. Title-case names without this pattern remain
+    unchanged.
+    """
+    tokens = str(value).split()
+    if len(tokens) < 3:
+        return str(value).strip()
+
+    uppercase_prefix = 0
+    for token in tokens:
+        if re.fullmatch(r"[A-Z][A-Z.'-]*", token):
+            uppercase_prefix += 1
+        else:
+            break
+
+    if uppercase_prefix >= 2 and uppercase_prefix < len(tokens):
+        return " ".join(tokens[:uppercase_prefix]).strip()
+    return str(value).strip()
+
+
 def _extract_pan_fields(text, pages, fields):
     if "pan_number" not in fields:
         match = re.search(PAN, text, re.I)
@@ -174,13 +199,19 @@ def _extract_pan_fields(text, pages, fields):
                 and len(line.split()) >= 2
                 and not excluded.search(line)
             ]
-            if "full_name" not in fields and name_candidates:
-                index, value = name_candidates[-2] if len(name_candidates) >= 2 else name_candidates[-1]
-                fields["full_name"] = _field(value, value, pages, "pan_layout_name")
-            if "parent_name" not in fields and len(name_candidates) >= 2:
-                index, value = name_candidates[-1]
+            # Clean OCR spillover before assigning layout-derived names. Keep
+            # the original line as source evidence so reviewers can audit it.
+            cleaned_candidates = [
+                (index, line, _clean_pan_name_candidate(line))
+                for index, line in name_candidates
+            ]
+            if "full_name" not in fields and cleaned_candidates:
+                index, evidence, value = cleaned_candidates[-2] if len(cleaned_candidates) >= 2 else cleaned_candidates[-1]
+                fields["full_name"] = _field(value, evidence, pages, "pan_layout_name")
+            if "parent_name" not in fields and len(cleaned_candidates) >= 2:
+                index, evidence, value = cleaned_candidates[-1]
                 if "full_name" not in fields or value != fields["full_name"]["value"]:
-                    fields["parent_name"] = _field(value, value, pages, "pan_layout_parent_name")
+                    fields["parent_name"] = _field(value, evidence, pages, "pan_layout_parent_name")
 
 
 def _extract_line_items(tables, pages):
