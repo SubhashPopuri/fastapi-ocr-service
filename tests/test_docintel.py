@@ -50,3 +50,63 @@ def test_json_file_is_flattened_for_schema_extraction():
     result=process_document("invoice.json",b'{"invoice_number":"JSON-42","invoice_date":"2026-11-04"}',"application/json")
     assert result["document"]["document_type"]=="invoice"
     assert result["extracted_data"]["invoice_number"]["value"]=="JSON-42"
+
+
+def test_month_name_invoice_date_normalizes():
+    assert normalize_value("invoice_date", "04-Nov-2026") == "2026-11-04"
+    assert normalize_value("due_date", "19-Nov-2026") == "2026-11-19"
+
+
+def test_phone_extraction_does_not_capture_invoice_number():
+    text = "Invoice No: INV-2026-1042\nPhone: +91 98765 43210"
+    fields = extract_fields(text, "invoice", [{"page": 1, "text": text}])
+    assert fields["phone"]["value"] == "+91 98765 43210"
+    assert fields["phone"]["normalized_value"] == "+919876543210"
+
+
+def test_invoice_party_gstin_and_currency_extraction():
+    text = (
+        "ACME OFFICE SUPPLIES\nTAX INVOICE\nInvoice No: INV-2026-1042\n"
+        "GSTIN: 36ABCDE1234F1Z5\nBILL TO\nDemo Customer Private Limited\n"
+        "GSTIN: 36AABCD1234E1Z2\nEmail: accounts@example.com"
+    )
+    fields = extract_fields(text, "invoice", [{"page": 1, "text": text}])
+    assert fields["vendor_name"]["value"] == "ACME OFFICE SUPPLIES"
+    assert fields["customer_name"]["value"] == "Demo Customer Private Limited"
+    assert fields["vendor_gstin"]["value"] == "36ABCDE1234F1Z5"
+    assert fields["customer_gstin"]["value"] == "36AABCD1234E1Z2"
+
+
+def test_invoice_line_items_and_financial_reconciliation():
+    text = (
+        "Invoice Number: INV-TEST-1\nSubtotal: INR 105,000.00\n"
+        "CGST: INR 9,450.00\nSGST: INR 9,450.00\n"
+        "Grand Total: INR 123,900.00\nAmount Due: INR 123,900.00"
+    )
+    tables = [{
+        "page": 1, "table_index": 1,
+        "rows": [
+            ["Description", "HSN/SAC", "Qty", "Unit Price (INR)", "Amount (INR)"],
+            ["Office laptops", "84713010", "2", "45,000.00", "90,000.00"],
+            ["Wireless keyboards", "84716040", "5", "1,200.00", "6,000.00"],
+            ["USB-C docking stations", "84718000", "2", "4,500.00", "9,000.00"],
+        ],
+    }]
+    fields = extract_fields(text, "invoice", [{"page": 1, "text": text}], tables)
+    validation = validate_fields(fields, "invoice")
+    assert len(fields["line_items"]["value"]) == 3
+    assert fields["subtotal"]["normalized_value"] == "105000.00"
+    assert fields["grand_total"]["normalized_value"] == "123900.00"
+    assert not any(w["code"] == "line_items_subtotal_mismatch" for w in validation["warnings"])
+    assert not any(w["code"] == "grand_total_mismatch" for w in validation["warnings"])
+
+
+def test_financial_reconciliation_flags_mismatch():
+    fields = {
+        "subtotal": {"value": "100", "normalized_value": "100.00"},
+        "cgst_amount": {"value": "9", "normalized_value": "9.00"},
+        "sgst_amount": {"value": "9", "normalized_value": "9.00"},
+        "grand_total": {"value": "120", "normalized_value": "120.00"},
+    }
+    validation = validate_fields(fields, "invoice")
+    assert any(w["code"] == "grand_total_mismatch" for w in validation["warnings"])
