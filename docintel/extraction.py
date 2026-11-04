@@ -156,7 +156,7 @@ def _extract_pan_fields(text, pages, fields):
     # standalone DOB. Use this conservative layout fallback only when labels
     # did not yield the corresponding fields.
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    dob_pattern = re.compile(r"^(\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}|\\d{4}[/-]\\d{1,2}[/-]\\d{1,2})$")
+    dob_pattern = re.compile(r"^(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})$")
     dob_index = next((i for i, line in enumerate(lines) if dob_pattern.fullmatch(line)), None)
     if dob_index is not None:
         dob_line = lines[dob_index]
@@ -164,8 +164,8 @@ def _extract_pan_fields(text, pages, fields):
             fields["date_of_birth"] = _field(dob_line, dob_line, pages, "pan_layout_dob")
         if "full_name" not in fields or "parent_name" not in fields:
             excluded = re.compile(
-                r"\\b(income tax|department|government|govt|india|permanent|account|number|"
-                r"signature|sample|imm[i1]help)\\b", re.I
+                r"\b(income tax|department|government|govt|india|permanent|account|number|"
+                r"signature|sample|imm[i1]help)\b", re.I
             )
             name_candidates = [
                 (i, line) for i, line in enumerate(lines[:dob_index])
