@@ -28,8 +28,8 @@ def process_pdf(data):
                 try:
                     imgs=convert_from_bytes(data,dpi=get_settings().ocr_dpi,first_page=number,last_page=number,fmt="png")
                     if imgs:
-                        ocr_text,conf=_ocr(imgs[0])
-                        if len(ocr_text)>len(text): text,method=ocr_text,"tesseract_ocr"
+                        ocr_text,ocr_conf=_ocr(imgs[0])
+                        if len(ocr_text)>len(text): text,method,conf=ocr_text,"tesseract_ocr",ocr_conf
                 except Exception as exc: warnings.append(f"Page {number} OCR failed/unavailable ({type(exc).__name__}).")
             pages.append({"page":number,"text":text,"method":method,"ocr_confidence":conf}); methods.append(method)
             try:

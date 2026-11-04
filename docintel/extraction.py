@@ -37,5 +37,6 @@ def validate_fields(fields,document_type):
             warnings.append({"field":key,"code":"date_unrecognized","message":"Date could not be normalized unambiguously."})
         if key in AMOUNT_FIELDS and item.get("normalized_value") is None:
             warnings.append({"field":key,"code":"amount_unrecognized","message":"Amount could not be normalized."})
-    for key,item in fields.items(): item["validation_status"]="invalid" if any(e["field"]==key for e in errors) else "valid"
+    for key,item in fields.items():
+        item["validation_status"]="invalid" if any(e["field"]==key for e in errors) else "warning" if any(w["field"]==key for w in warnings) else "valid"
     return {"is_valid":not errors,"errors":errors,"warnings":warnings}
