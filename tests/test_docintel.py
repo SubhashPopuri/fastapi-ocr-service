@@ -177,3 +177,22 @@ def test_existing_invoice_schema_and_classification_remain_available():
     assert "invoice" in SCHEMAS
     assert classify("TAX INVOICE Invoice Number: INV-1 Amount Due: 100")["document_type"] == "invoice"
     assert "pan_card" in SCHEMAS
+
+
+def test_pan_card_extracts_unlabelled_names_and_standalone_dob_from_ocr_layout():
+    # Tesseract output observed from a scanned PAN card with no name labels.
+    text = (
+        "RAHUL GUPTA\\nSURESH GUPTA\\n\\n"
+        "23/11/1974\\nPermanent Account Number\\n\\n"
+        "ABCDE1234F\\n\\nSAMPLE - IMMIHELP.COM\\nSignature"
+    )
+    fields = extract_fields(text, "pan_card", [{"page": 1, "text": text}])
+    assert fields["full_name"]["value"] == "RAHUL GUPTA"
+    assert fields["parent_name"]["value"] == "SURESH GUPTA"
+    assert fields["date_of_birth"]["value"] == "23/11/1974"
+    assert fields["date_of_birth"]["normalized_value"] == "1974-11-23"
+    assert fields["pan_number"]["value"] == "ABCDE1234F"
+    assert "holder_category" not in fields
+    validation = validate_fields(fields, "pan_card")
+    assert not validation["is_valid"]
+    assert any(error["code"] == "pan_invalid_holder_type" for error in validation["errors"])
