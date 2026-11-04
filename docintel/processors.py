@@ -1,6 +1,6 @@
 """Format-specific processors for PDF, images and office/text files."""
 from io import BytesIO
-import csv
+import csv\nimport json\nimport xml.etree.ElementTree as ET\nfrom html.parser import HTMLParser
 import pdfplumber
 import pytesseract
 from PIL import Image
@@ -43,7 +43,21 @@ def process_image(data):
     return {"text":text,"pages":[{"page":1,"text":text,"method":"tesseract_ocr","ocr_confidence":conf}],"page_count":1,"tables":[],"methods":["tesseract_ocr"],"warnings":[]}
 def process_other(data,suffix):
     tables=[]; text=""
-    if suffix==".txt": text=data.decode("utf-8-sig",errors="replace")
+    if suffix in {".txt",".md",".log",".yaml",".yml"}: text=data.decode("utf-8-sig",errors="replace")
+    elif suffix==".json":
+        raw=data.decode("utf-8-sig",errors="replace")
+        try: text=json.dumps(json.loads(raw),ensure_ascii=False,indent=2)
+        except json.JSONDecodeError: text=raw
+    elif suffix==".xml":
+        raw=data.decode("utf-8-sig",errors="replace")
+        try: text=" ".join(part.strip() for part in ET.fromstring(raw).itertext() if part.strip())
+        except ET.ParseError: text=raw
+    elif suffix in {".html",".htm"}:
+        class TextExtractor(HTMLParser):
+            def __init__(self): super().__init__(); self.parts=[]
+            def handle_data(self,data):
+                if data.strip(): self.parts.append(data.strip())
+        parser=TextExtractor(); parser.feed(data.decode("utf-8-sig",errors="replace")); text="\\n".join(parser.parts)
     elif suffix==".csv":
         rows=list(csv.reader(data.decode("utf-8-sig",errors="replace").splitlines()))
         if rows: tables=[{"page":1,"table_index":1,"rows":rows}]

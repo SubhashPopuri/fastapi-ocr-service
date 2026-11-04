@@ -5,7 +5,7 @@ import mimetypes
 from PIL import Image,UnidentifiedImageError
 from fastapi import HTTPException,UploadFile
 from .config import get_settings
-ALLOWED={".pdf",".png",".jpg",".jpeg",".tif",".tiff",".bmp",".txt",".csv",".docx",".xlsx"}
+ALLOWED={".pdf",".png",".jpg",".jpeg",".tif",".tiff",".bmp",".txt",".csv",".docx",".xlsx",".json",".xml",".html",".htm",".md",".log",".yaml",".yml"}
 async def read_upload(upload:UploadFile):
     name=(upload.filename or "document").replace("\\","/").split("/")[-1]
     suffix=("."+name.rsplit(".",1)[-1].lower()) if "." in name else ""
@@ -32,4 +32,5 @@ def detect_type(data:bytes,suffix:str):
                 if required not in names: raise HTTPException(400,"File content does not match extension.")
             return "application/vnd.openxmlformats-officedocument.wordprocessingml.document" if suffix==".docx" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         except BadZipFile: raise HTTPException(400,"Invalid Office document.")
-    return "text/csv" if suffix==".csv" else "text/plain"
+    if suffix==".csv": return "text/csv"
+    return {".json":"application/json",".xml":"application/xml",".html":"text/html",".htm":"text/html",".md":"text/markdown",".yaml":"application/yaml",".yml":"application/yaml"}.get(suffix,"text/plain")

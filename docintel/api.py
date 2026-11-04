@@ -24,6 +24,6 @@ def schema(document_type:str):
 @router.get("/v1/system/capabilities")
 def capabilities():
     s=get_settings()
-    return {"service":"Document Intelligence Platform","version":"1.0.0","formats":["pdf","png","jpg","jpeg","tiff","bmp","txt","csv","docx","xlsx"],"document_types":list(SCHEMAS),"ocr":{"provider":"Tesseract","language":s.ocr_language},"limits":{"max_upload_bytes":s.max_upload_bytes,"max_pdf_pages":s.max_pdf_pages,"max_image_pixels":s.max_image_pixels}}
+    return {"service":"Document Intelligence Platform","version":"1.0.0","formats":["pdf","png","jpg","jpeg","tiff","bmp","txt","csv","docx","xlsx","json","xml","html","md","log","yaml","yml"],"document_types":list(SCHEMAS),"ocr":{"provider":"Tesseract","language":s.ocr_language},"limits":{"max_upload_bytes":s.max_upload_bytes,"max_pdf_pages":s.max_pdf_pages,"max_image_pixels":s.max_image_pixels}}
 @router.get("/ready",tags=["Health"])
 def ready(): return {"status":"ready"}
