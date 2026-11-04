@@ -18,7 +18,11 @@ PHONE_SKIP = ("invoice", "gstin", "hsn", "sac", "ifsc", "account number", "due d
 
 
 def _field(value, evidence, pages, method="label_pattern"):
-    page = next((p["page"] for p in pages if evidence in p.get("text", "")), None)
+    page = next(
+        (p["page"] for p in pages
+         if evidence in p.get("text", "") or str(value) in p.get("text", "")),
+        None,
+    )
     return {
         "value": value,
         "normalized_value": None,
@@ -45,6 +49,20 @@ def _find(text, labels):
                     if following:
                         return following, line + " | " + following
     return None, None
+
+
+def _clean_amount(value):
+    """Select the monetary amount, not a tax-rate percentage preceding it."""
+    if value is None:
+        return None
+    raw = str(value).strip()
+    # Remove parenthesized percentage/rate annotations such as (9%) or (18.0%).
+    raw = re.sub(r"\(\s*\d+(?:\.\d+)?\s*%\s*\)", " ", raw)
+    candidates = re.findall(r"(?<![A-Za-z0-9])[-+]?\d[\d,]*(?:\.\d{1,})?", raw)
+    if not candidates:
+        return None
+    # Monetary values commonly follow the rate annotation and currency code.
+    return candidates[-1]
 
 
 def _decimal(value):
@@ -174,6 +192,10 @@ def extract_fields(text, document_type, pages, tables=None):
     for key, labels in schema["fields"].items():
         value, evidence = _find(text, labels)
         if value:
+            if key in AMOUNT_FIELDS:
+                amount = _clean_amount(value)
+                if amount is not None:
+                    value = amount
             fields[key] = _field(value, evidence, pages)
 
     if document_type == "invoice":
