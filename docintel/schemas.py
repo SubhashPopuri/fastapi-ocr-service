@@ -109,6 +109,7 @@ def list_schemas():
             "document_type": key,
             "version": value["version"],
             "required_fields": value["required"],
+            "expected_fields": value.get("expected", value["required"]),
             "fields": list(value["fields"]),
         }
         for key, value in SCHEMAS.items()
