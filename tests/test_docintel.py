@@ -45,3 +45,8 @@ def test_main_registers_legacy_and_v1_routes():
     paths={route.path for route in app.routes}
     assert "/pdf" in paths and "/image" in paths
     assert "/v1/documents/process" in paths and "/v1/documents/schemas" in paths
+
+def test_json_file_is_flattened_for_schema_extraction():
+    result=process_document("invoice.json",b'{"invoice_number":"JSON-42","invoice_date":"2026-11-04"}',"application/json")
+    assert result["document"]["document_type"]=="invoice"
+    assert result["extracted_data"]["invoice_number"]["value"]=="JSON-42"
