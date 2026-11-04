@@ -13,7 +13,7 @@ def process_document(filename,data,media_type,include_raw_text=False):
     review=classification["review_required"] or bool(validation["errors"]) or bool(validation["warnings"])
     payload={"request_id":"req_"+uuid.uuid4().hex,"status":"success" if result["text"].strip() or result["tables"] else "completed_with_warnings",
       "document":{"filename":filename,"media_type":media_type,"document_type":classification["document_type"],"page_count":result["page_count"],"size_bytes":len(data)},
-      "classification":classification,"extracted_data":fields,"tables":result["tables"],"pages":result["pages"],"validation":validation,"review_required":review,
+      "classification":classification,"extracted_data":fields,"tables":result["tables"],"pages":[{"page":page["page"],"method":page["method"],"ocr_confidence":page.get("ocr_confidence"),"text_length":len(page.get("text",""))} for page in result["pages"]],"validation":validation,"review_required":review,
       "processing":{"methods":result["methods"],"ocr_used":"tesseract_ocr" in result["methods"],"duration_ms":round((time.perf_counter()-start)*1000)},
       "warnings":result["warnings"]+([] if result["text"].strip() else ["No readable text was extracted."])}
     if include_raw_text: payload["raw_text"]=result["text"]

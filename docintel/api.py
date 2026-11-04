@@ -8,8 +8,9 @@ from .config import get_settings
 router=APIRouter(tags=["Document Intelligence"])
 @router.post("/v1/documents/process",summary="Process PDF, image, Word, Excel, CSV or text file")
 async def process(file:UploadFile=File(...),include_raw_text:bool=Query(False,description="Return full extracted text; disabled by default")):
-    filename,data,media=await read_upload(file)
-    try: return await run_in_threadpool(process_document,filename,data,media,include_raw_text)
+    try:
+        filename,data,media=await read_upload(file)
+        return await run_in_threadpool(process_document,filename,data,media,include_raw_text)
     except HTTPException: raise
     except ValueError as exc: raise HTTPException(422,str(exc))
     except Exception as exc: raise HTTPException(422,f"Processing failed ({type(exc).__name__}). Check server diagnostics.")
