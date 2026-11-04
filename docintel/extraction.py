@@ -1,5 +1,6 @@
 """Schema-guided extraction with source evidence and conservative validation."""
 import re
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from .schemas import SCHEMAS
@@ -334,7 +335,19 @@ def extract_fields(text, document_type, pages, tables=None):
         phone_field = _extract_phone(text, pages)
         if phone_field:
             fields["phone"] = phone_field
-    return normalize_fields(fields)
+    normalized_fields = normalize_fields(fields)
+    # Indian PAN cards print DOB as DD/MM/YYYY. Unlike generic documents,
+    # this field has a known day-first convention, so normalize it explicitly
+    # instead of rejecting dates where both day and month are <= 12.
+    if document_type == "pan_card" and "date_of_birth" in normalized_fields:
+        raw_dob = str(normalized_fields["date_of_birth"].get("value", "")).strip()
+        for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                normalized_fields["date_of_birth"]["normalized_value"] = datetime.strptime(raw_dob, fmt).date().isoformat()
+                break
+            except ValueError:
+                continue
+    return normalized_fields
 
 
 def validate_fields(fields, document_type):
