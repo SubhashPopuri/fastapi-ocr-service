@@ -4,7 +4,7 @@ services:
     runtime: docker
     plan: starter
     region: singapore
-    branch: implementation/document-intelligence-platform
+    branch: feature/document-intelligence-demo-webapp
     dockerfilePath: ./Dockerfile
     dockerContext: .
     autoDeploy: true
@@ -12,6 +12,12 @@ services:
     envVars:
       - key: DOCINTEL_API_KEY
         generateValue: true
+      - key: DOCINTEL_DEMO_PASSWORD
+        generateValue: true
+      - key: DOCINTEL_DEMO_SESSION_SECRET
+        generateValue: true
+      - key: DOCINTEL_UPSTREAM_API_URL
+        value: https://fastapi-ocr-service-1.onrender.com
       - key: DOCINTEL_REVIEW_OCR_CONFIDENCE_THRESHOLD
         value: "70"
       - key: DOCINTEL_MAX_UPLOAD_BYTES
