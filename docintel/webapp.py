@@ -25,7 +25,7 @@ async def home():
     if not HTML_PATH.exists(): raise HTTPException(503,"Demo web application is not installed.")
     return FileResponse(HTML_PATH,media_type="text/html")
 @router.post("/app/login",include_in_schema=False)
-async def login(response:Response,password:str=Form(...)):
+async def login(request:Request,response:Response,password:str=Form(...)):
     expected=os.getenv("DOCINTEL_DEMO_PASSWORD","")
     if not expected or not _secret(): raise HTTPException(503,"Demo portal credentials are not configured.")
     if not hmac.compare_digest(password,expected): raise HTTPException(401,"Incorrect demo password.")
