@@ -29,11 +29,11 @@ async def login(response:Response,password:str=Form(...)):
     expected=os.getenv("DOCINTEL_DEMO_PASSWORD","")
     if not expected or not _secret(): raise HTTPException(503,"Demo portal credentials are not configured.")
     if not hmac.compare_digest(password,expected): raise HTTPException(401,"Incorrect demo password.")
-    response.set_cookie(COOKIE_NAME,_make_session(),max_age=COOKIE_TTL_SECONDS,httponly=True,secure=True,samesite="strict",path="/app")
+    response.set_cookie(COOKIE_NAME,_make_session(),max_age=COOKIE_TTL_SECONDS,httponly=True,secure=(request.url.scheme == "https"),samesite="strict",path="/app")
     return {"status":"authenticated"}
 @router.post("/app/logout",include_in_schema=False)
-async def logout(response:Response):
-    response.delete_cookie(COOKIE_NAME,path="/app",secure=True,httponly=True,samesite="strict"); return {"status":"logged_out"}
+async def logout(request:Request,response:Response):
+    response.delete_cookie(COOKIE_NAME,path="/app",secure=(request.url.scheme == "https"),httponly=True,samesite="strict"); return {"status":"logged_out"}
 @router.get("/app/api/status",include_in_schema=False)
 async def status(request:Request):
     _auth(request); upstream=os.getenv("DOCINTEL_UPSTREAM_API_URL","").rstrip("/"); key=os.getenv("DOCINTEL_API_KEY","")
