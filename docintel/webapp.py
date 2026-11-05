@@ -40,8 +40,13 @@ async def status(request:Request):
     if not upstream or not key: raise HTTPException(503,"OCR API connection is not configured.")
     try:
         async with httpx.AsyncClient(timeout=20) as client: result=await client.get(upstream+"/v1/system/capabilities",headers={"X-API-Key":key})
-        if result.status_code!=200: raise HTTPException(502,"OCR API health check failed.")
-        return {"status":"connected","capabilities":result.json()}
+        if result.status_code!=200:
+            raise HTTPException(502,f"OCR API health check returned HTTP {result.status_code} ({result.headers.get('content-type','unknown content type')}).")
+        try:
+            capabilities=result.json()
+        except ValueError:
+            raise HTTPException(502,f"OCR API health check returned non-JSON content ({result.headers.get('content-type','unknown content type')}).")
+        return {"status":"connected","capabilities":capabilities}
     except httpx.HTTPError: raise HTTPException(502,"Unable to reach the OCR API.")
 @router.post("/app/api/process",include_in_schema=False)
 async def process(request:Request,file:UploadFile=File(...)):
@@ -53,11 +58,21 @@ async def process(request:Request,file:UploadFile=File(...)):
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(150.0,connect=15.0)) as client:
             result=await client.post(upstream+"/v1/documents/process",headers={"X-API-Key":key},files={"file":(file.filename or "upload",content,file.content_type or "application/octet-stream")})
-        try: payload=result.json()
-        except ValueError: payload={"detail":"OCR API returned a non-JSON response."}
+        try:
+            payload=result.json()
+        except ValueError:
+            content_type=result.headers.get("content-type","unknown content type")
+            excerpt=" ".join(result.text.split())[:400]
+            raise HTTPException(
+                502,
+                f"OCR API returned HTTP {result.status_code} with {content_type}, not JSON. "
+                f"Response preview: {excerpt or '[empty response]'}"
+            )
         if result.status_code>=400:
             detail=payload.get("detail","OCR API processing failed.") if isinstance(payload,dict) else "OCR API processing failed."
             raise HTTPException(result.status_code,detail)
+        if not isinstance(payload,dict):
+            raise HTTPException(502,"OCR API returned JSON in an unexpected format; an object was expected.")
         return payload
     except httpx.TimeoutException: raise HTTPException(504,"OCR processing timed out. Try a smaller or lower-resolution document.")
     except httpx.HTTPError: raise HTTPException(502,"Unable to reach the OCR API.")
