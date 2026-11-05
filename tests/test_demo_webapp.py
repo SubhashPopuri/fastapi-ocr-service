@@ -12,7 +12,7 @@ def test_demo_portal_routes_are_registered():
 
 
 def test_demo_session_signature_and_expiry(monkeypatch):
-    from docintel.webapp import _make_session, _valid_session
+    from docintel.webapp import _make_session, _valid
     monkeypatch.setenv("DOCINTEL_DEMO_SESSION_SECRET", "test-session-secret")
     token = _make_session()
     assert _valid_session(token)
