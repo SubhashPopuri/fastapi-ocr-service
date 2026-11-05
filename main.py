@@ -24,6 +24,8 @@ app = FastAPI(title="Document Intelligence Platform", description="OCR and struc
 
 from docintel.api import router as document_intelligence_router
 app.include_router(document_intelligence_router)
+from docintel.webapp import router as demo_web_router
+app.include_router(demo_web_router)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
