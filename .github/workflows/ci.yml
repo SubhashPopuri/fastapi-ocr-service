@@ -46,5 +46,10 @@ jobs:
           done
           cat /tmp/ocr-health.json
           python -c "import json; d=json.load(open('/tmp/ocr-health.json')); assert d['status'] == 'ok', d"
-        finally: |
-          if [ -f /tmp/ocr-api.pid ]; then kill "$(cat /tmp/ocr-api.pid)" || true; fi
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f /tmp/ocr-api.pid ]; then
+            kill "$(cat /tmp/ocr-api.pid)" || true
+          fi
