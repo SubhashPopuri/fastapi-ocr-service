@@ -1,0 +1,50 @@
+name: OCR API CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install OCR system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus poppler-utils libgl1 libglib2.0-0
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compile Python source
+        run: python -m compileall -q main.py
+
+      - name: Start API and verify health
+        run: |
+          uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/ocr-api.log 2>&1 &
+          echo $! > /tmp/ocr-api.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/ocr-health.json; then
+              break
+            fi
+            sleep 2
+          done
+          cat /tmp/ocr-health.json
+          python -c "import json; d=json.load(open('/tmp/ocr-health.json')); assert d['status'] == 'ok', d"
+        finally: |
+          if [ -f /tmp/ocr-api.pid ]; then kill "$(cat /tmp/ocr-api.pid)" || true; fi
